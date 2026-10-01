@@ -1,0 +1,830 @@
+<!DOCTYPE html>
+<html lang="en" class="light">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>Salary & Attendance Manager</title>
+    <!-- Tailwind CSS -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <!-- Font Awesome -->
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <!-- Google Fonts -->
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+    
+    <script>
+        tailwind.config = {
+            darkMode: 'class',
+            theme: {
+                extend: {
+                    fontFamily: {
+                        sans: ['Inter', 'sans-serif'],
+                    },
+                    colors: {
+                        brand: {
+                            50: '#f0fdfa',
+                            100: '#ccfbf1',
+                            500: '#14b8a6', // Teal as the primary single tone
+                            600: '#0d9488',
+                            900: '#134e4a',
+                        },
+                        dark: {
+                            bg: '#0f172a',    // Slate 900
+                            card: '#1e293b',  // Slate 800
+                            border: '#334155' // Slate 700
+                        }
+                    }
+                }
+            }
+        }
+    </script>
+    <style>
+        body {
+            font-family: 'Inter', sans-serif;
+            -webkit-tap-highlight-color: transparent;
+        }
+        
+        /* Hide scrollbars but keep functionality */
+        ::-webkit-scrollbar {
+            width: 0px;
+            background: transparent;
+        }
+
+        .calendar-day {
+            transition: transform 0.1s ease-in-out, background-color 0.2s, border-color 0.2s;
+            cursor: pointer;
+            user-select: none;
+        }
+        .calendar-day:active {
+            transform: scale(0.92);
+        }
+
+        /* Status Colors - Adaptive for Light/Dark Mode */
+        /* Light Mode Classes */
+        .status-present { @apply bg-green-100 text-green-700 border-green-500 border-2 font-bold; }
+        .status-absent { @apply bg-red-100 text-red-700 border-red-500 border-2 font-bold; }
+        .status-half { @apply bg-yellow-100 text-yellow-700 border-yellow-500 border-2 font-bold; }
+        .status-unmarked { @apply bg-white text-gray-700 border-gray-200 border; }
+
+        /* Dark Mode Classes */
+        .dark .status-present { @apply bg-green-900/40 text-green-400 border-green-500 border-2; }
+        .dark .status-absent { @apply bg-red-900/40 text-red-400 border-red-500 border-2; }
+        .dark .status-half { @apply bg-yellow-900/40 text-yellow-400 border-yellow-500 border-2; }
+        .dark .status-unmarked { @apply bg-dark-card text-gray-300 border-dark-border border; }
+
+        /* Hide number input arrows */
+        input[type=number]::-webkit-inner-spin-button, 
+        input[type=number]::-webkit-outer-spin-button { 
+            -webkit-appearance: none; 
+            margin: 0; 
+        }
+    </style>
+</head>
+<body class="bg-gray-50 dark:bg-dark-bg text-gray-800 dark:text-gray-200 antialiased h-[100dvh] flex justify-center transition-colors duration-300">
+
+    <!-- Mobile-Optimized Container -->
+    <div class="w-full max-w-md bg-gray-50 dark:bg-dark-bg flex flex-col h-full relative shadow-2xl sm:border-x sm:border-gray-200 dark:sm:border-dark-border">
+        
+        <!-- Header -->
+        <header class="bg-white dark:bg-dark-card p-5 border-b border-gray-200 dark:border-dark-border z-10 sticky top-0 transition-colors duration-300">
+            <div class="flex justify-between items-center mb-5">
+                <h1 class="text-xl font-bold tracking-tight text-gray-900 dark:text-white">PayTracker</h1>
+                <div class="flex gap-3">
+                    <button id="themeToggle" class="w-10 h-10 rounded-full bg-gray-100 dark:bg-gray-800 text-gray-600 dark:text-gray-300 flex items-center justify-center hover:bg-gray-200 dark:hover:bg-gray-700 transition">
+                        <i class="fa-solid fa-moon dark:hidden"></i>
+                        <i class="fa-solid fa-sun hidden dark:block text-yellow-400"></i>
+                    </button>
+                </div>
+            </div>
+            
+            <div class="flex items-center gap-4 cursor-pointer p-1 -ml-1 rounded-xl hover:bg-gray-100 dark:hover:bg-gray-800 transition" id="workerSelectorBtn">
+                <div class="w-12 h-12 bg-brand-500 rounded-full flex items-center justify-center text-xl text-white font-bold shrink-0 shadow-sm">
+                    <span id="avatar-initial">A</span>
+                </div>
+                <div class="flex-1 pr-2">
+                    <h2 class="text-lg font-semibold text-gray-900 dark:text-white leading-tight flex items-center gap-2">
+                        <span id="display-name">Worker Name</span> 
+                        <i class="fa-solid fa-chevron-down text-[10px] text-gray-600 dark:text-gray-400 bg-gray-200 dark:bg-gray-700 rounded-full w-5 h-5 flex items-center justify-center"></i>
+                    </h2>
+                    <p class="text-gray-500 dark:text-gray-400 text-sm font-medium">Base: ₹<span id="display-base-salary">0</span>/mo</p>
+                </div>
+            </div>
+        </header>
+
+        <main class="flex-1 overflow-y-auto p-5 pb-8 space-y-6">
+            
+            <!-- Salary Summary Card -->
+            <div class="bg-brand-500 rounded-3xl p-6 text-white shadow-lg relative overflow-hidden">
+                <!-- Decorative element -->
+                <div class="absolute -right-10 -top-10 w-32 h-32 rounded-full border-4 border-white/20"></div>
+                <div class="absolute -left-10 -bottom-10 w-24 h-24 rounded-full bg-white/10"></div>
+                
+                <div class="relative z-10">
+                    <div class="flex justify-between items-center mb-1">
+                        <span class="text-brand-50 text-sm font-medium opacity-90">Net Payable</span>
+                        <div class="bg-white/20 backdrop-blur-sm px-3 py-1 rounded-full text-xs font-semibold" id="month-pill">
+                            Oct '26
+                        </div>
+                    </div>
+                    <div class="text-5xl font-bold mb-6 tracking-tight">₹<span id="net-salary">0</span></div>
+                    
+                    <div class="grid grid-cols-2 gap-4 text-sm bg-black/10 rounded-2xl p-4 backdrop-blur-sm">
+                        <div>
+                            <div class="text-brand-100 text-xs uppercase tracking-widest font-semibold mb-1">Deductions</div>
+                            <div class="font-medium text-lg">-₹<span id="total-deductions">0</span></div>
+                        </div>
+                        <div>
+                            <div class="text-brand-100 text-xs uppercase tracking-widest font-semibold mb-1">Daily Wage</div>
+                            <div class="font-medium text-lg">₹<span id="daily-wage">0</span></div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Month Selector & Attendance -->
+            <section>
+                <div class="flex justify-between items-center mb-4">
+                    <h3 class="font-bold text-gray-900 dark:text-white text-lg">Attendance</h3>
+                    
+                    <!-- Compact Month Nav -->
+                    <div class="flex items-center bg-white dark:bg-dark-card rounded-full shadow-sm border border-gray-200 dark:border-dark-border p-1">
+                        <button id="prevMonth" class="w-8 h-8 flex items-center justify-center rounded-full hover:bg-gray-100 dark:hover:bg-gray-800 text-gray-600 dark:text-gray-400 transition">
+                            <i class="fa-solid fa-angle-left"></i>
+                        </button>
+                        <span id="current-month-display" class="text-sm font-semibold px-2 min-w-[90px] text-center text-gray-800 dark:text-gray-200">October</span>
+                        <button id="nextMonth" class="w-8 h-8 flex items-center justify-center rounded-full hover:bg-gray-100 dark:hover:bg-gray-800 text-gray-600 dark:text-gray-400 transition">
+                            <i class="fa-solid fa-angle-right"></i>
+                        </button>
+                    </div>
+                </div>
+                
+                <!-- Legend -->
+                <div class="flex justify-between items-center text-xs mb-3 px-1 font-medium text-gray-500 dark:text-gray-400">
+                    <div class="flex items-center gap-1.5"><div class="w-2.5 h-2.5 rounded-full bg-green-500"></div> Present</div>
+                    <div class="flex items-center gap-1.5"><div class="w-2.5 h-2.5 rounded-full bg-red-500"></div> Absent</div>
+                    <div class="flex items-center gap-1.5"><div class="w-2.5 h-2.5 rounded-full bg-yellow-500"></div> Half</div>
+                    <div class="flex items-center gap-1.5"><i class="fa-solid fa-hand-pointer text-gray-400"></i> Tap</div>
+                </div>
+
+                <!-- Calendar Grid -->
+                <div class="bg-white dark:bg-dark-card border border-gray-200 dark:border-dark-border rounded-2xl p-4 shadow-sm transition-colors duration-300">
+                    <div class="grid grid-cols-7 gap-1 text-center text-xs font-bold text-gray-400 dark:text-gray-500 mb-3 uppercase tracking-wider">
+                        <div>S</div><div>M</div><div>T</div><div>W</div><div>T</div><div>F</div><div>S</div>
+                    </div>
+                    <div id="calendar-grid" class="grid grid-cols-7 gap-2 text-center text-sm">
+                        <!-- Days generated by JS -->
+                    </div>
+                </div>
+            </section>
+
+            <section>
+                <h3 class="font-bold text-gray-900 dark:text-white text-lg mb-3">Advances / Deductions</h3>
+                <div class="bg-white dark:bg-dark-card border border-gray-200 dark:border-dark-border rounded-2xl p-4 shadow-sm transition-colors duration-300">
+                    <div class="flex items-center gap-3">
+                        <div class="flex-1 relative">
+                            <div class="absolute inset-y-0 left-0 pl-4 flex items-center pointer-events-none">
+                                <span class="text-gray-500 dark:text-gray-400 font-medium">₹</span>
+                            </div>
+                            <input type="number" id="extra-deduction-input" placeholder="Amount (e.g. 500)" class="w-full bg-gray-50 dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-xl py-3 pl-8 pr-4 focus:outline-none focus:ring-2 focus:ring-brand-500 text-gray-900 dark:text-white placeholder-gray-400 dark:placeholder-gray-500 transition-all font-medium">
+                        </div>
+                        <button id="addDeductionBtn" class="bg-brand-500 hover:bg-brand-600 text-white px-5 py-3 rounded-xl font-semibold transition whitespace-nowrap shadow-sm">
+                            Save
+                        </button>
+                    </div>
+                </div>
+            </section>
+
+        </main>
+    </div>
+
+    <!-- Attendance Action Sheet -->
+    <div id="attendanceModal" class="fixed inset-0 bg-gray-900/60 dark:bg-black/80 backdrop-blur-sm z-50 hidden flex-col justify-end p-0 sm:p-4 opacity-0 transition-opacity duration-300">
+        <div class="bg-white dark:bg-dark-card w-full sm:max-w-md mx-auto rounded-t-3xl sm:rounded-3xl shadow-2xl transform translate-y-full transition-all duration-300 ease-out flex flex-col overflow-hidden" id="attendanceModalContent">
+            <div class="p-5 border-b border-gray-100 dark:border-dark-border flex justify-between items-center bg-gray-50 dark:bg-gray-800/50">
+                <div>
+                    <h3 class="font-bold text-lg text-gray-900 dark:text-white leading-tight">Mark Attendance</h3>
+                    <p id="attendanceDateDisplay" class="text-sm text-gray-500 dark:text-gray-400 font-medium"></p>
+                </div>
+                <button id="closeAttendanceBtn" class="w-8 h-8 bg-gray-200 dark:bg-gray-700 rounded-full text-gray-600 hover:text-gray-900 dark:text-gray-400 dark:hover:text-white transition flex items-center justify-center">
+                    <i class="fa-solid fa-xmark"></i>
+                </button>
+            </div>
+            <div class="p-4 grid grid-cols-2 gap-3">
+                <button class="attendance-btn bg-green-50 hover:bg-green-100 dark:bg-green-900/20 dark:hover:bg-green-900/40 text-green-700 dark:text-green-400 border border-green-200 dark:border-green-800 rounded-xl p-4 flex flex-col items-center justify-center gap-2 transition shadow-sm" data-status="present">
+                    <i class="fa-solid fa-circle-check text-2xl"></i>
+                    <span class="font-bold">Present</span>
+                </button>
+                <button class="attendance-btn bg-red-50 hover:bg-red-100 dark:bg-red-900/20 dark:hover:bg-red-900/40 text-red-700 dark:text-red-400 border border-red-200 dark:border-red-800 rounded-xl p-4 flex flex-col items-center justify-center gap-2 transition shadow-sm" data-status="absent">
+                    <i class="fa-solid fa-circle-xmark text-2xl"></i>
+                    <span class="font-bold">Absent</span>
+                </button>
+                <button class="attendance-btn bg-yellow-50 hover:bg-yellow-100 dark:bg-yellow-900/20 dark:hover:bg-yellow-900/40 text-yellow-700 dark:text-yellow-400 border border-yellow-200 dark:border-yellow-800 rounded-xl p-4 flex flex-col items-center justify-center gap-2 transition shadow-sm" data-status="half">
+                    <i class="fa-solid fa-circle-half-stroke text-2xl"></i>
+                    <span class="font-bold">Half Day</span>
+                </button>
+                <button class="attendance-btn bg-gray-50 hover:bg-gray-100 dark:bg-gray-800 dark:hover:bg-gray-700 text-gray-600 dark:text-gray-300 border border-gray-200 dark:border-gray-700 rounded-xl p-4 flex flex-col items-center justify-center gap-2 transition shadow-sm" data-status="unmarked">
+                    <i class="fa-regular fa-circle text-2xl"></i>
+                    <span class="font-bold">Clear</span>
+                </button>
+            </div>
+        </div>
+    </div>
+
+    <div id="settingsModal" class="fixed inset-0 bg-gray-900/60 dark:bg-black/80 backdrop-blur-sm z-[60] hidden flex-col justify-end sm:justify-center p-0 sm:p-4 opacity-0 transition-opacity duration-300">
+        <!-- Bottom Sheet on Mobile, Centered Modal on Desktop -->
+        <div class="bg-white dark:bg-dark-card w-full sm:max-w-md mx-auto rounded-t-3xl sm:rounded-3xl shadow-2xl transform translate-y-full sm:translate-y-0 sm:scale-95 transition-all duration-300 ease-out flex flex-col max-h-[90vh]" id="settingsModalContent">
+            
+            <div class="p-6 border-b border-gray-100 dark:border-dark-border flex justify-between items-center sticky top-0 bg-white dark:bg-dark-card rounded-t-3xl z-10">
+                <h3 class="font-bold text-xl text-gray-900 dark:text-white">Edit Worker</h3>
+                <button id="closeSettingsBtn" class="w-8 h-8 bg-gray-100 dark:bg-gray-800 rounded-full text-gray-500 hover:text-gray-800 dark:text-gray-400 dark:hover:text-white transition flex items-center justify-center">
+                    <i class="fa-solid fa-xmark"></i>
+                </button>
+            </div>
+            
+            <div class="p-6 overflow-y-auto">
+                <div class="space-y-5">
+                    <div>
+                        <label class="block text-sm font-semibold text-gray-700 dark:text-gray-300 mb-2">Worker Name</label>
+                        <input type="text" id="nameInput" class="w-full bg-gray-50 dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-xl px-4 py-3 focus:outline-none focus:ring-2 focus:ring-brand-500 text-gray-900 dark:text-white font-medium transition" placeholder="e.g. Raju">
+                    </div>
+                    <div>
+                        <label class="block text-sm font-semibold text-gray-700 dark:text-gray-300 mb-2">Monthly Base Salary (₹)</label>
+                        <input type="number" id="salaryInput" class="w-full bg-gray-50 dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-xl px-4 py-3 focus:outline-none focus:ring-2 focus:ring-brand-500 text-gray-900 dark:text-white font-medium transition" placeholder="e.g. 15000">
+                    </div>
+                    
+                    <!-- Stats Section (Read Only) -->
+                    <div class="pt-4 mt-4 border-t border-gray-100 dark:border-dark-border">
+                        <h4 class="text-xs font-bold text-gray-400 dark:text-gray-500 uppercase tracking-wider mb-3">Overall Stats</h4>
+                        <div class="grid grid-cols-2 gap-3">
+                            <div class="bg-gray-50 dark:bg-gray-800 p-3 rounded-xl">
+                                <div class="text-xs text-gray-500 dark:text-gray-400">Total Leaves Recorded</div>
+                                <div class="text-lg font-bold text-gray-900 dark:text-white" id="stat-leaves">0</div>
+                            </div>
+                            <div class="bg-gray-50 dark:bg-gray-800 p-3 rounded-xl">
+                                <div class="text-xs text-gray-500 dark:text-gray-400">Total Advances Given</div>
+                                <div class="text-lg font-bold text-gray-900 dark:text-white">₹<span id="stat-advances">0</span></div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="pt-4 mt-2">
+                        <button id="deleteWorkerBtn" class="w-full bg-red-50 hover:bg-red-100 dark:bg-red-900/20 dark:hover:bg-red-900/40 text-red-600 dark:text-red-400 border border-red-200 dark:border-red-800 font-bold py-3 rounded-xl transition-colors">
+                            Delete This Worker
+                        </button>
+                    </div>
+                </div>
+            </div>
+
+            <div class="p-6 border-t border-gray-100 dark:border-dark-border sticky bottom-0 bg-white dark:bg-dark-card rounded-b-3xl">
+                <button id="saveSettingsBtn" class="w-full bg-brand-500 hover:bg-brand-600 text-white font-bold py-3.5 rounded-xl shadow-md transition-colors">
+                    Save Changes
+                </button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Worker Selection Modal -->
+    <div id="workerModal" class="fixed inset-0 bg-gray-900/60 dark:bg-black/80 backdrop-blur-sm z-50 hidden flex-col justify-end sm:justify-center p-0 sm:p-4 opacity-0 transition-opacity duration-300">
+        <div class="bg-white dark:bg-dark-card w-full sm:max-w-md mx-auto rounded-t-3xl sm:rounded-3xl shadow-2xl transform translate-y-full sm:translate-y-0 sm:scale-95 transition-all duration-300 ease-out flex flex-col max-h-[85vh]" id="workerModalContent">
+            <div class="p-6 border-b border-gray-100 dark:border-dark-border flex justify-between items-center bg-white dark:bg-dark-card rounded-t-3xl sticky top-0 z-10">
+                <h3 class="font-bold text-xl text-gray-900 dark:text-white">Select Worker</h3>
+                <button id="closeWorkerBtn" class="w-8 h-8 bg-gray-100 dark:bg-gray-800 rounded-full text-gray-500 hover:text-gray-800 dark:text-gray-400 dark:hover:text-white transition flex items-center justify-center">
+                    <i class="fa-solid fa-xmark"></i>
+                </button>
+            </div>
+            <div class="p-4 overflow-y-auto flex-1 space-y-3" id="workerListContainer">
+                <!-- Workers injected here -->
+            </div>
+            <div class="p-6 border-t border-gray-100 dark:border-dark-border sticky bottom-0 bg-white dark:bg-dark-card rounded-b-3xl">
+                <button id="addNewWorkerBtn" class="w-full bg-gray-100 hover:bg-gray-200 dark:bg-gray-800 dark:hover:bg-gray-700 text-gray-800 dark:text-white border border-gray-200 dark:border-gray-700 font-bold py-3.5 rounded-xl shadow-sm transition-colors flex items-center justify-center gap-2">
+                    <i class="fa-solid fa-plus"></i> Add New Worker
+                </button>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        let appState = {
+            workers: [
+                { id: 'w_default', name: 'Anil', baseSalary: 12000, attendance: {}, extraDeductions: {} }
+            ],
+            currentWorkerId: 'w_default',
+            currentDate: new Date(), 
+            isDarkMode: false
+        };
+
+        let selectedAttendanceDateKey = null;
+
+        const monthNames = ["January", "February", "March", "April", "May", "June", "July", "August", "September", "October", "November", "December"];
+        const shortMonthNames = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"];
+        
+        const els = {
+            displayName: document.getElementById('display-name'),
+            avatarInitial: document.getElementById('avatar-initial'),
+            displayBaseSalary: document.getElementById('display-base-salary'),
+            workerSelectorBtn: document.getElementById('workerSelectorBtn'),
+            
+            monthPill: document.getElementById('month-pill'),
+            currentMonthDisplay: document.getElementById('current-month-display'),
+            calendarGrid: document.getElementById('calendar-grid'),
+            
+            netSalary: document.getElementById('net-salary'),
+            totalDeductions: document.getElementById('total-deductions'),
+            dailyWage: document.getElementById('daily-wage'),
+            extraDeductionInput: document.getElementById('extra-deduction-input'),
+            
+            prevMonth: document.getElementById('prevMonth'),
+            nextMonth: document.getElementById('nextMonth'),
+            addDeductionBtn: document.getElementById('addDeductionBtn'),
+            themeToggle: document.getElementById('themeToggle'),
+            htmlRoot: document.documentElement,
+            
+            settingsModal: document.getElementById('settingsModal'),
+            settingsModalContent: document.getElementById('settingsModalContent'),
+            closeSettingsBtn: document.getElementById('closeSettingsBtn'),
+            saveSettingsBtn: document.getElementById('saveSettingsBtn'),
+            deleteWorkerBtn: document.getElementById('deleteWorkerBtn'),
+            nameInput: document.getElementById('nameInput'),
+            salaryInput: document.getElementById('salaryInput'),
+            statLeaves: document.getElementById('stat-leaves'),
+            statAdvances: document.getElementById('stat-advances'),
+            
+            attendanceModal: document.getElementById('attendanceModal'),
+            attendanceModalContent: document.getElementById('attendanceModalContent'),
+            attendanceDateDisplay: document.getElementById('attendanceDateDisplay'),
+            closeAttendanceBtn: document.getElementById('closeAttendanceBtn'),
+            attendanceBtns: document.querySelectorAll('.attendance-btn'),
+
+            workerModal: document.getElementById('workerModal'),
+            workerModalContent: document.getElementById('workerModalContent'),
+            closeWorkerBtn: document.getElementById('closeWorkerBtn'),
+            workerListContainer: document.getElementById('workerListContainer'),
+            addNewWorkerBtn: document.getElementById('addNewWorkerBtn')
+        };
+
+        function getCurrentWorker() {
+            let worker = appState.workers.find(w => w.id === appState.currentWorkerId);
+            if (!worker) {
+                worker = appState.workers[0];
+                appState.currentWorkerId = worker.id;
+            }
+            return worker;
+        }
+
+        function init() {
+            loadState();
+            applyTheme();
+            updateHeaderUI();
+            renderCalendar();
+            setupEventListeners();
+        }
+
+        function loadState() {
+            const savedState = localStorage.getItem('payTrackerState');
+            if (savedState) {
+                try {
+                    const parsed = JSON.parse(savedState);
+                    
+                    // Migrate legacy single-worker state
+                    if (parsed.name && !parsed.workers) {
+                        appState.workers = [{
+                            id: 'w_' + Date.now(),
+                            name: parsed.name,
+                            baseSalary: parsed.baseSalary,
+                            attendance: parsed.attendance || {},
+                            extraDeductions: parsed.extraDeductions || {}
+                        }];
+                        appState.currentWorkerId = appState.workers[0].id;
+                        appState.isDarkMode = parsed.isDarkMode === true;
+                    } else if (parsed.workers) {
+                        appState.workers = parsed.workers;
+                        appState.currentWorkerId = parsed.currentWorkerId || parsed.workers[0].id;
+                        appState.isDarkMode = parsed.isDarkMode === true;
+                    }
+                } catch(e) {
+                    console.error("Error loading state", e);
+                }
+            } else {
+                if (window.matchMedia && window.matchMedia('(prefers-color-scheme: dark)').matches) {
+                    appState.isDarkMode = true;
+                }
+            }
+            
+            // Safety fallback
+            if (!appState.workers || appState.workers.length === 0) {
+                 appState.workers = [{ id: 'w_default', name: 'Worker', baseSalary: 12000, attendance: {}, extraDeductions: {} }];
+                 appState.currentWorkerId = 'w_default';
+            }
+        }
+
+        function saveState() {
+            const stateToSave = {
+                workers: appState.workers,
+                currentWorkerId: appState.currentWorkerId,
+                isDarkMode: appState.isDarkMode
+            };
+            localStorage.setItem('payTrackerState', JSON.stringify(stateToSave));
+        }
+
+        function applyTheme() {
+            if (appState.isDarkMode) {
+                els.htmlRoot.classList.add('dark');
+            } else {
+                els.htmlRoot.classList.remove('dark');
+            }
+        }
+
+        function toggleTheme() {
+            appState.isDarkMode = !appState.isDarkMode;
+            applyTheme();
+            saveState();
+        }
+
+        function updateHeaderUI() {
+            const worker = getCurrentWorker();
+            els.displayName.textContent = worker.name;
+            els.avatarInitial.textContent = worker.name.charAt(0).toUpperCase() || 'W';
+            els.displayBaseSalary.textContent = worker.baseSalary.toLocaleString('en-IN');
+        }
+
+        function getMonthKey(date) {
+            return `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, '0')}`;
+        }
+
+        function formatDateKey(year, month, day) {
+            return `${year}-${String(month + 1).padStart(2, '0')}-${String(day).padStart(2, '0')}`;
+        }
+
+        function renderCalendar() {
+            const worker = getCurrentWorker();
+            const year = appState.currentDate.getFullYear();
+            const month = appState.currentDate.getMonth();
+            const monthKey = getMonthKey(appState.currentDate);
+            const today = new Date();
+            const isCurrentMonth = today.getFullYear() === year && today.getMonth() === month;
+
+            els.currentMonthDisplay.textContent = `${monthNames[month]} ${year}`;
+            els.monthPill.textContent = `${shortMonthNames[month]} '${String(year).slice(-2)}`;
+
+            const firstDay = new Date(year, month, 1).getDay(); 
+            const daysInMonth = new Date(year, month + 1, 0).getDate();
+
+            els.calendarGrid.innerHTML = '';
+
+            for (let i = 0; i < firstDay; i++) {
+                const emptyCell = document.createElement('div');
+                emptyCell.className = 'w-full aspect-square'; 
+                els.calendarGrid.appendChild(emptyCell);
+            }
+
+            for (let i = 1; i <= daysInMonth; i++) {
+                const dateKey = formatDateKey(year, month, i);
+                const status = worker.attendance[dateKey] || 'unmarked';
+                const isToday = isCurrentMonth && today.getDate() === i;
+                
+                const dayEl = document.createElement('div');
+                
+                let classes = `w-full aspect-square mx-auto rounded-xl flex items-center justify-center text-sm calendar-day status-${status}`;
+                
+                if (isToday && status === 'unmarked') {
+                    classes += ' ring-2 ring-brand-500 ring-offset-2 dark:ring-offset-dark-card font-bold';
+                }
+
+                dayEl.className = classes;
+                dayEl.textContent = i;
+                
+                dayEl.addEventListener('touchstart', () => dayEl.classList.add('opacity-75'), {passive: true});
+                dayEl.addEventListener('touchend', () => dayEl.classList.remove('opacity-75'), {passive: true});
+                
+                dayEl.addEventListener('click', () => openAttendanceModal(dateKey, i, year, month));
+                
+                els.calendarGrid.appendChild(dayEl);
+            }
+
+            els.extraDeductionInput.value = worker.extraDeductions[monthKey] || '';
+
+            calculateSalary(daysInMonth, monthKey, year, month, worker);
+        }
+
+        function calculateSalary(daysInMonth, monthKey, year, month, worker) {
+            let absentCount = 0;
+            let halfCount = 0;
+            
+            for (let i = 1; i <= daysInMonth; i++) {
+                const dateKey = formatDateKey(year, month, i);
+                const status = worker.attendance[dateKey];
+                
+                if (status === 'absent') absentCount++;
+                if (status === 'half') halfCount++;
+            }
+
+            const dailyWageRaw = worker.baseSalary / daysInMonth; 
+            const dailyWage = Math.round(dailyWageRaw);
+            
+            const absentDeduction = absentCount * dailyWageRaw;
+            const halfDeduction = halfCount * (dailyWageRaw / 2);
+            
+            const manualDeduction = parseFloat(worker.extraDeductions[monthKey]) || 0;
+            const totalDeductions = Math.round(absentDeduction + halfDeduction + manualDeduction);
+            const netPayable = Math.max(0, worker.baseSalary - totalDeductions);
+
+            els.dailyWage.textContent = dailyWage.toLocaleString('en-IN');
+            els.totalDeductions.textContent = totalDeductions.toLocaleString('en-IN');
+            els.netSalary.textContent = netPayable.toLocaleString('en-IN');
+        }
+
+        function openAttendanceModal(dateKey, dayNumber, year, month) {
+            selectedAttendanceDateKey = dateKey;
+            const dateObj = new Date(year, month, dayNumber);
+            const options = { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' };
+            els.attendanceDateDisplay.textContent = dateObj.toLocaleDateString('en-IN', options);
+
+            els.attendanceModal.classList.remove('hidden');
+            els.attendanceModal.classList.add('flex');
+            
+            setTimeout(() => {
+                els.attendanceModal.classList.add('opacity-100');
+                els.attendanceModalContent.classList.remove('translate-y-full');
+                els.attendanceModalContent.classList.add('translate-y-0');
+            }, 10);
+        }
+
+        function closeAttendanceModal() {
+            els.attendanceModal.classList.remove('opacity-100');
+            els.attendanceModalContent.classList.remove('translate-y-0');
+            els.attendanceModalContent.classList.add('translate-y-full');
+            
+            setTimeout(() => {
+                els.attendanceModal.classList.add('hidden');
+                els.attendanceModal.classList.remove('flex');
+                selectedAttendanceDateKey = null;
+            }, 300);
+        }
+
+        function updateStats(worker) {
+            let totalLeaves = 0;
+            let totalAdvances = 0;
+
+            for (let key in worker.attendance) {
+                if (worker.attendance[key] === 'absent') totalLeaves += 1;
+                if (worker.attendance[key] === 'half') totalLeaves += 0.5;
+            }
+
+            for (let key in worker.extraDeductions) {
+                totalAdvances += parseFloat(worker.extraDeductions[key]) || 0;
+            }
+
+            els.statLeaves.textContent = totalLeaves;
+            els.statAdvances.textContent = totalAdvances.toLocaleString('en-IN');
+        }
+
+        let editingWorkerId = null;
+
+        function openWorkerModal() {
+            els.workerListContainer.innerHTML = '';
+            appState.workers.forEach(w => {
+                const isActive = w.id === appState.currentWorkerId;
+                const itemDiv = document.createElement('div');
+                itemDiv.className = `w-full text-left p-1 rounded-xl border flex items-center justify-between transition-colors mb-2 ${isActive ? 'bg-brand-50 border-brand-200 dark:bg-brand-900/20 dark:border-brand-800' : 'bg-white border-gray-200 hover:bg-gray-50 dark:bg-dark-card dark:border-gray-700 dark:hover:bg-gray-800'}`;
+                
+                const selectArea = document.createElement('div');
+                selectArea.className = "flex-1 flex items-center gap-3 p-3 cursor-pointer";
+                selectArea.innerHTML = `
+                    <div class="w-10 h-10 rounded-full ${isActive ? 'bg-brand-500 text-white' : 'bg-gray-200 dark:bg-gray-700 text-gray-600 dark:text-gray-300'} flex items-center justify-center font-bold shrink-0">
+                        ${w.name.charAt(0).toUpperCase()}
+                    </div>
+                    <div>
+                        <div class="font-bold ${isActive ? 'text-brand-700 dark:text-brand-400' : 'text-gray-900 dark:text-white'}">${w.name}</div>
+                        <div class="text-xs text-gray-500 dark:text-gray-400">₹${w.baseSalary.toLocaleString('en-IN')}/mo</div>
+                    </div>
+                `;
+                selectArea.onclick = () => {
+                    appState.currentWorkerId = w.id;
+                    saveState();
+                    updateHeaderUI();
+                    renderCalendar();
+                    closeWorkerModal();
+                };
+
+                const actionArea = document.createElement('div');
+                actionArea.className = "flex items-center gap-1 pr-3";
+                
+                if (isActive) {
+                    const checkIcon = document.createElement('i');
+                    checkIcon.className = "fa-solid fa-circle-check text-brand-500 text-xl mr-2";
+                    actionArea.appendChild(checkIcon);
+                }
+                
+                const editBtn = document.createElement('button');
+                editBtn.className = "w-9 h-9 rounded-full flex items-center justify-center text-gray-400 hover:text-brand-500 hover:bg-brand-50 dark:hover:bg-brand-900/30 transition-colors";
+                editBtn.innerHTML = '<i class="fa-solid fa-pen"></i>';
+                editBtn.onclick = (e) => {
+                    e.stopPropagation();
+                    openSettingsModal(w.id);
+                };
+                actionArea.appendChild(editBtn);
+
+                itemDiv.appendChild(selectArea);
+                itemDiv.appendChild(actionArea);
+
+                els.workerListContainer.appendChild(itemDiv);
+            });
+
+            els.workerModal.classList.remove('hidden');
+            els.workerModal.classList.add('flex');
+            setTimeout(() => {
+                els.workerModal.classList.add('opacity-100');
+                els.workerModalContent.classList.remove('translate-y-full', 'sm:scale-95');
+                els.workerModalContent.classList.add('translate-y-0', 'sm:scale-100');
+            }, 10);
+        }
+
+        function closeWorkerModal() {
+            els.workerModal.classList.remove('opacity-100');
+            els.workerModalContent.classList.remove('translate-y-0', 'sm:scale-100');
+            els.workerModalContent.classList.add('translate-y-full', 'sm:scale-95');
+            setTimeout(() => {
+                els.workerModal.classList.add('hidden');
+                els.workerModal.classList.remove('flex');
+            }, 300);
+        }
+
+        function addNewWorker() {
+            const newId = 'w_' + Date.now();
+            appState.workers.push({
+                id: newId,
+                name: 'New Worker',
+                baseSalary: 12000,
+                attendance: {},
+                extraDeductions: {}
+            });
+            appState.currentWorkerId = newId;
+            saveState();
+            updateHeaderUI();
+            renderCalendar();
+            openWorkerModal();
+            openSettingsModal(newId);
+        }
+
+        function openSettingsModal(workerId) {
+            editingWorkerId = workerId;
+            const worker = appState.workers.find(w => w.id === workerId) || getCurrentWorker();
+            
+            els.nameInput.value = worker.name;
+            els.salaryInput.value = worker.baseSalary;
+            updateStats(worker);
+            
+            els.settingsModal.classList.remove('hidden');
+            els.settingsModal.classList.add('flex');
+            
+            setTimeout(() => {
+                els.settingsModal.classList.add('opacity-100');
+                els.settingsModalContent.classList.remove('translate-y-full', 'sm:scale-95');
+                els.settingsModalContent.classList.add('translate-y-0', 'sm:scale-100');
+            }, 10);
+        }
+
+        function closeSettingsModal() {
+            els.settingsModal.classList.remove('opacity-100');
+            els.settingsModalContent.classList.remove('translate-y-0', 'sm:scale-100');
+            els.settingsModalContent.classList.add('translate-y-full', 'sm:scale-95');
+            
+            setTimeout(() => {
+                els.settingsModal.classList.add('hidden');
+                els.settingsModal.classList.remove('flex');
+                editingWorkerId = null;
+            }, 300);
+        }
+
+        function setupEventListeners() {
+            els.themeToggle.addEventListener('click', toggleTheme);
+            els.workerSelectorBtn.addEventListener('click', openWorkerModal);
+            els.closeWorkerBtn.addEventListener('click', closeWorkerModal);
+            els.addNewWorkerBtn.addEventListener('click', addNewWorker);
+            
+            els.workerModal.addEventListener('click', (e) => {
+                if(e.target === els.workerModal) closeWorkerModal();
+            });
+
+            els.prevMonth.addEventListener('click', () => {
+                appState.currentDate.setMonth(appState.currentDate.getMonth() - 1);
+                renderCalendar();
+            });
+
+            els.nextMonth.addEventListener('click', () => {
+                appState.currentDate.setMonth(appState.currentDate.getMonth() + 1);
+                renderCalendar();
+            });
+
+            els.closeAttendanceBtn.addEventListener('click', closeAttendanceModal);
+            
+            els.attendanceModal.addEventListener('click', (e) => {
+                if(e.target === els.attendanceModal) closeAttendanceModal();
+            });
+
+            els.attendanceBtns.forEach(btn => {
+                btn.addEventListener('click', (e) => {
+                    if (!selectedAttendanceDateKey) return;
+                    
+                    const status = btn.getAttribute('data-status');
+                    const worker = getCurrentWorker();
+                    
+                    if (status === 'unmarked') {
+                        delete worker.attendance[selectedAttendanceDateKey];
+                    } else {
+                        worker.attendance[selectedAttendanceDateKey] = status;
+                    }
+                    
+                    saveState();
+                    renderCalendar();
+                    closeAttendanceModal();
+                });
+            });
+
+            let touchStartX = 0;
+            els.calendarGrid.addEventListener('touchstart', e => touchStartX = e.changedTouches[0].screenX, {passive: true});
+            els.calendarGrid.addEventListener('touchend', e => {
+                let touchEndX = e.changedTouches[0].screenX;
+                if (touchEndX < touchStartX - 50) els.nextMonth.click(); 
+                if (touchEndX > touchStartX + 50) els.prevMonth.click(); 
+            }, {passive: true});
+
+            els.addDeductionBtn.addEventListener('click', () => {
+                const amount = parseFloat(els.extraDeductionInput.value);
+                const monthKey = getMonthKey(appState.currentDate);
+                const worker = getCurrentWorker();
+                
+                if (isNaN(amount) || amount === 0) {
+                    delete worker.extraDeductions[monthKey];
+                } else {
+                    worker.extraDeductions[monthKey] = amount;
+                }
+                
+                saveState();
+                renderCalendar();
+                
+                const originalText = els.addDeductionBtn.textContent;
+                els.addDeductionBtn.innerHTML = '<i class="fa-solid fa-check"></i>';
+                els.addDeductionBtn.classList.add('bg-green-500');
+                els.addDeductionBtn.classList.remove('bg-brand-500');
+                setTimeout(() => { 
+                    els.addDeductionBtn.textContent = 'Save'; 
+                    els.addDeductionBtn.classList.remove('bg-green-500');
+                els.addDeductionBtn.classList.add('bg-brand-500');
+                }, 1000);
+            });
+
+            els.closeSettingsBtn.addEventListener('click', closeSettingsModal);
+            
+            els.settingsModal.addEventListener('click', (e) => {
+                if(e.target === els.settingsModal) closeSettingsModal();
+            });
+
+            els.saveSettingsBtn.addEventListener('click', () => {
+                const newName = els.nameInput.value.trim();
+                const newSalary = parseFloat(els.salaryInput.value);
+                const worker = appState.workers.find(w => w.id === editingWorkerId);
+
+                if (worker) {
+                    if (newName) worker.name = newName;
+                    if (!isNaN(newSalary) && newSalary > 0) worker.baseSalary = newSalary;
+                }
+
+                updateHeaderUI();
+                saveState();
+                renderCalendar(); 
+                
+                if (!els.workerModal.classList.contains('hidden')) {
+                    openWorkerModal();
+                }
+                closeSettingsModal();
+            });
+
+            els.deleteWorkerBtn.addEventListener('click', () => {
+                if (appState.workers.length <= 1) {
+                    const ogText = els.deleteWorkerBtn.textContent;
+                    els.deleteWorkerBtn.textContent = "Cannot delete last worker";
+                    setTimeout(() => els.deleteWorkerBtn.textContent = ogText, 2000);
+                    return;
+                }
+                
+                appState.workers = appState.workers.filter(w => w.id !== editingWorkerId);
+                
+                if (appState.currentWorkerId === editingWorkerId) {
+                    appState.currentWorkerId = appState.workers[0].id;
+                }
+                
+                saveState();
+                updateHeaderUI();
+                renderCalendar();
+                
+                if (!els.workerModal.classList.contains('hidden')) {
+                    openWorkerModal();
+                }
+                closeSettingsModal();
+            });
+        }
+
+        window.addEventListener('DOMContentLoaded', init);
+    </script>
+</body>
+</html>
